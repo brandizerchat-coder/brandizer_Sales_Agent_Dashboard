@@ -1,0 +1,22 @@
+[server]
+headless = true
+
+[client]
+toolbarMode = "viewer"
+
+[theme]
+baseRadius = "medium"
+
+[theme.light]
+primaryColor = "#C99200"
+backgroundColor = "#FFFFFF"
+secondaryBackgroundColor = "#F4F4F2"
+textColor = "#0A0A0A"
+chartCategoricalColors = ["#1F1F1F", "#E0A100"]
+
+[theme.dark]
+primaryColor = "#F2B300"
+backgroundColor = "#0A0A0A"
+secondaryBackgroundColor = "#1A1A1A"
+textColor = "#F5F5F5"
+chartCategoricalColors = ["#EDEDED", "#F2B300"]
