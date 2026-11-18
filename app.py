@@ -115,8 +115,12 @@ st.markdown(
   .bz-title {color:#fff; font-size:1.15rem; font-weight:600; text-align:right; line-height:1.35;}
   .bz-title small {display:block; color:#BDBDBD; font-weight:400; font-size:.85rem;}
   .bz-title b {color:#E8A800;}
-  [data-testid="stMetric"] {padding: 14px 16px;}
-  [data-testid="stMetricValue"] {font-weight:700;}
+  .bz-kpis {display:grid; grid-template-columns:repeat(4, minmax(0, 1fr)); gap:14px; margin:4px 0 18px;}
+  @media (max-width: 760px) {.bz-kpis {grid-template-columns:repeat(2, minmax(0, 1fr));}}
+  .bz-kpi {border:1px solid rgba(128,128,128,.35); border-radius:12px; padding:16px 18px; min-height:112px;}
+  .bz-kpi-label {font-size:.92rem; opacity:.75; line-height:1.25;}
+  .bz-kpi-value {font-size:2.1rem; font-weight:700; line-height:1.15; margin-top:6px; white-space:nowrap;}
+  .bz-kpi-note {font-size:.82rem; color:#E8A800; margin-top:2px; min-height:1em;}
   h3 {font-size:1.05rem !important; font-weight:600 !important; margin-bottom:0 !important;}
 </style>
 """,
@@ -177,27 +181,25 @@ contacted, replied = s("is_contacted"), s("is_replied")
 rate = f"{replied / contacted:.0%}" if contacted else "—"
 
 
-def kpi_row(items):
-    for col, (label, value, help_) in zip(st.columns(len(items)), items):
-        col.metric(label, value, help=help_, border=True)
+def kpi_cards(items):
+    """Plain-HTML cards: labels wrap instead of being cut, values never shrink to '1..'."""
+    cards = "".join(
+        f'<div class="bz-kpi" title="{help_}"><div class="bz-kpi-label">{label}</div>'
+        f'<div class="bz-kpi-value">{value}</div><div class="bz-kpi-note">{note}</div></div>'
+        for label, value, note, help_ in items)
+    st.markdown(f'<div class="bz-kpis">{cards}</div>', unsafe_allow_html=True)
 
 
-kpi_row([
-    ("Total leads", f"{total:,}", "Unique companies collected from Google Maps (each counted once)."),
-    ("New this week", f"{new7:,}", "Leads collected in the last 7 days."),
-    ("Awaiting audit", f"{s('awaiting_audit'):,}", "Companies with a website that are not audited yet."),
-    ("Audited", f"{s('is_audited'):,}", "Websites checked by the audit workflow."),
-    ("Qualified", f"{s('is_qualified'):,}", "Audited and good enough for a personalised email."),
-    ("Pending approval", f"{s('is_pending_approval'):,}", "Emails waiting for your Approve / Reject decision."),
-])
-st.write("")
-kpi_row([
-    ("Rejected", f"{s('is_rejected'):,}", "Emails rejected at approval."),
-    ("Emails sent", f"{contacted:,}", "Companies that received the first email."),
-    ("Follow-ups sent", f"{s('is_followup_sent'):,}", "The single follow-up, sent after 3 working days."),
-    ("Replies to confirm", f"{s('is_reply_awaiting'):,}", "Replies detected automatically, waiting for a person to mark YES or NO."),
-    ("Confirmed replies", f"{replied:,}", "Replies a person marked YES."),
-    ("Reply rate", rate, "Confirmed replies ÷ companies emailed."),
+to_confirm = s("is_reply_awaiting")
+kpi_cards([
+    ("Total leads", f"{total:,}", "", "Unique companies collected from Google Maps, each counted once."),
+    ("New this week", f"{new7:,}", "", "Leads collected in the last 7 days."),
+    ("Websites checked", f"{s('is_audited'):,}", "", "Company websites reviewed by the audit."),
+    ("Ready to email", f"{s('is_qualified'):,}", "", "Checked and good enough for a personal email."),
+    ("Waiting for approval", f"{s('is_pending_approval'):,}", "", "Emails waiting for an Approve or Reject decision."),
+    ("Emails sent", f"{contacted:,}", f"+ {s('is_followup_sent'):,} follow-ups" if s('is_followup_sent') else "", "Companies that received the first email."),
+    ("Replies", f"{replied:,}", f"{to_confirm:,} to confirm" if to_confirm else "", "Replies confirmed as real (replied = YES)."),
+    ("Reply rate", rate, "", "Replies ÷ emails sent."),
 ])
 
 
@@ -261,8 +263,8 @@ def slim(fig: go.Figure, n: int) -> go.Figure:
 c1, c2 = st.columns(2)
 with c1:
     st.subheader("Pipeline funnel")
-    stages = [("Leads", total), ("Audited", s("is_audited")), ("Qualified", s("is_qualified")),
-              ("Approved", s("is_approved")), ("Emailed", contacted), ("Replied", replied)]
+    stages = [("Leads", total), ("Websites checked", s("is_audited")), ("Ready to email", s("is_qualified")),
+              ("Approved", s("is_approved")), ("Emails sent", contacted), ("Replies", replied)]
     fig = go.Figure(go.Funnel(y=[x for x, _ in stages], x=[v for _, v in stages], texttemplate="<b>%{value}</b>  ·  %{percentInitial:.0%}",
                               textposition="outside", textfont=dict(size=13),
                               marker=dict(color=YELLOW),
@@ -339,20 +341,5 @@ with c6:
 with c7:
     st.subheader("Where leads are now")
     show(hbar(p["pipeline_status"].value_counts()))
-
-st.subheader("Latest activity")
-recent = (p[p["last_activity_at"].notna()].sort_values("last_activity_at", ascending=False).head(20)
-          [["company", "industry", "service_category", "pipeline_status", "last_activity_at"]])
-if recent.empty:
-    empty("No activity yet.")
-else:
-    st.dataframe(
-        recent, hide_index=True, width="stretch",
-        column_config={
-            "company": "Company", "industry": "Industry", "service_category": "Service category",
-            "pipeline_status": "Status",
-            "last_activity_at": st.column_config.DatetimeColumn("Last activity", format="DD MMM YYYY, HH:mm"),
-        },
-    )
 
 st.caption(f"Updates automatically from the BRANDIZER sales workflows · refreshed {loaded:%H:%M}")
